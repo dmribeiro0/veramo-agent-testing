@@ -1,0 +1,49 @@
+{
+  "_format": "hh3-sol-build-info-1",
+  "id": "solc-0_8_28-c00356bc56e7c94a6878e46f46414fc91e128c69",
+  "solcVersion": "0.8.28",
+  "solcLongVersion": "0.8.28+commit.7893614a",
+  "compilerType": "solc",
+  "toolVersions": {
+    "hardhat": "3.9.0"
+  },
+  "userSourceNameMap": {
+    "contracts/RevocationRegistry.sol": "project/contracts/RevocationRegistry.sol"
+  },
+  "input": {
+    "language": "Solidity",
+    "settings": {
+      "evmVersion": "cancun",
+      "optimizer": {
+        "enabled": true,
+        "runs": 200
+      },
+      "outputSelection": {
+        "*": {
+          "": [
+            "ast"
+          ],
+          "*": [
+            "abi",
+            "evm.bytecode.linkReferences",
+            "evm.bytecode.object",
+            "evm.bytecode.opcodes",
+            "evm.bytecode.sourceMap",
+            "evm.deployedBytecode.immutableReferences",
+            "evm.deployedBytecode.linkReferences",
+            "evm.deployedBytecode.object",
+            "evm.deployedBytecode.opcodes",
+            "evm.deployedBytecode.sourceMap",
+            "evm.methodIdentifiers"
+          ]
+        }
+      },
+      "remappings": []
+    },
+    "sources": {
+      "project/contracts/RevocationRegistry.sol": {
+        "content": "// SPDX-License-Identifier: MIT\r\npragma solidity ^0.8.20;\r\n\r\ncontract RevocationRegistry {\r\n    address public issuer;\r\n    mapping(bytes32 => bool) public revoked;\r\n\r\n    event CredentialRevoked(bytes32 indexed credentialHash);\r\n\r\n    constructor(address _issuer) {\r\n        issuer = _issuer;\r\n    }\r\n\r\n    function revoke(bytes32 credentialHash) public {\r\n        require(msg.sender == issuer, \"Only the issuer can revoke credentials\");\r\n        revoked[credentialHash] = true;\r\n        emit CredentialRevoked(credentialHash);\r\n    }\r\n\r\n    function isRevoked(bytes32 credentialHash) public view returns (bool) {\r\n        return revoked[credentialHash];\r\n    }\r\n}"
+      }
+    }
+  }
+}

@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.env
+*.sqlite
+*.sqlite-journal
+
+# Hardhat
+hardhat/artifacts/
+hardhat/cache/
+hardhat/node_modules/
+
+# Misc
+*.log
+.DS_Store
