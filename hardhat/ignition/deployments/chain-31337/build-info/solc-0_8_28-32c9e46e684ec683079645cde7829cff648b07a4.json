@@ -1,0 +1,49 @@
+{
+  "_format": "hh3-sol-build-info-1",
+  "id": "solc-0_8_28-32c9e46e684ec683079645cde7829cff648b07a4",
+  "solcVersion": "0.8.28",
+  "solcLongVersion": "0.8.28+commit.7893614a",
+  "compilerType": "solc",
+  "toolVersions": {
+    "hardhat": "3.9.0"
+  },
+  "userSourceNameMap": {
+    "contracts/CreditoRU.sol": "project/contracts/CreditoRU.sol"
+  },
+  "input": {
+    "language": "Solidity",
+    "settings": {
+      "evmVersion": "cancun",
+      "optimizer": {
+        "enabled": true,
+        "runs": 200
+      },
+      "outputSelection": {
+        "*": {
+          "": [
+            "ast"
+          ],
+          "*": [
+            "abi",
+            "evm.bytecode.linkReferences",
+            "evm.bytecode.object",
+            "evm.bytecode.opcodes",
+            "evm.bytecode.sourceMap",
+            "evm.deployedBytecode.immutableReferences",
+            "evm.deployedBytecode.linkReferences",
+            "evm.deployedBytecode.object",
+            "evm.deployedBytecode.opcodes",
+            "evm.deployedBytecode.sourceMap",
+            "evm.methodIdentifiers"
+          ]
+        }
+      },
+      "remappings": []
+    },
+    "sources": {
+      "project/contracts/CreditoRU.sol": {
+        "content": "// SPDX-License-Identifier: MIT\r\npragma solidity ^0.8.20;\r\n\r\ncontract CreditoRU {\r\n    address public owner;\r\n    mapping(address => bool) public autorizados;\r\n    mapping(string => uint256) public saldoPorRA;\r\n    mapping(bytes32 => bool) public consumoRegistrado;\r\n\r\n    event CreditoAdicionado(string ra, uint256 quantidade, uint256 novoSaldo);\r\n    event CreditoConsumido(string ra, bytes32 indexed consumoId, uint256 timestamp, uint256 saldoRestante);\r\n    event AutorizadoAlterado(address conta, bool autorizado);\r\n\r\n    modifier apenasAutorizado() {\r\n        require(autorizados[msg.sender], \"Conta nao autorizada\");\r\n        _;\r\n    }\r\n\r\n    constructor(address _unifesp, address _ru) {\r\n        owner = msg.sender;\r\n        autorizados[_unifesp] = true;\r\n        autorizados[_ru] = true;\r\n    }\r\n\r\n    function definirAutorizado(address conta, bool autorizado) public {\r\n        require(msg.sender == owner, \"Apenas o owner pode alterar autorizados\");\r\n        autorizados[conta] = autorizado;\r\n        emit AutorizadoAlterado(conta, autorizado);\r\n    }\r\n\r\n    function adicionarCreditos(string memory ra, uint256 quantidade) public apenasAutorizado {\r\n        require(quantidade > 0, \"Quantidade deve ser maior que zero\");\r\n        saldoPorRA[ra] += quantidade;\r\n        emit CreditoAdicionado(ra, quantidade, saldoPorRA[ra]);\r\n    }\r\n\r\n    function consultarSaldo(string memory ra) public view returns (uint256) {\r\n        return saldoPorRA[ra];\r\n    }\r\n\r\n    function consumirCredito(string memory ra) public apenasAutorizado returns (bytes32) {\r\n        require(saldoPorRA[ra] > 0, \"Saldo insuficiente\");\r\n        saldoPorRA[ra] -= 1;\r\n\r\n        bytes32 consumoId = keccak256(abi.encodePacked(ra, block.timestamp, block.prevrandao));\r\n        consumoRegistrado[consumoId] = true;\r\n\r\n        emit CreditoConsumido(ra, consumoId, block.timestamp, saldoPorRA[ra]);\r\n        return consumoId;\r\n    }\r\n}"
+      }
+    }
+  }
+}

@@ -1,7 +1,7 @@
 import { writeFileSync } from 'fs'
 import { agent } from './veramo/setup.js'
 
-const HOLDER_DID = 'did:ethr:sepolia:0x026f899780f44cbb5edc5b52e2e508b6dac0a0c065bf52939166a089c10017806b'
+const HOLDER_DID = 'did:ethr:sepolia:0x0376d9e910f54a27789b3011b6f952aaa12a6c828056ef733147f91f54ade50273'
 
 async function main() {
     const issuer = await agent.didManagerGetByAlias({ alias: 'unifesp-issuer' })

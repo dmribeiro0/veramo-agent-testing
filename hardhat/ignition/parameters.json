@@ -1,5 +1,9 @@
 {
   "RevocationRegistryModule": {
     "issuerAddress": "0x4660B0CB81E3ffb6dca52A0d5F75fcF136307A39"
+  },
+  "CreditoRUModule": {
+    "unifespAddress": "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266",
+    "ruAddress": "0x70997970c51812dc3a010c7d01b50e0d17dc79c8"
   }
 }
