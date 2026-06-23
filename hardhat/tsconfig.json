@@ -5,7 +5,9 @@
     "target": "es2023",
     "skipLibCheck": true,
     "outDir": "dist",
-    "types": ["node", "mocha"],
     "verbatimModuleSyntax": true
-  }
+  },
+  "exclude": [
+    "scripts"
+  ]
 }

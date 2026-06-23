@@ -3,6 +3,9 @@ dist/
 .env
 *.sqlite
 *.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
+*.pdf
 
 # Hardhat
 hardhat/artifacts/

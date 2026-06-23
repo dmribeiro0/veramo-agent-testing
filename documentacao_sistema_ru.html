@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Documentação de Arquitetura e SSI — Sistema RU UNIFESP</title>
+  <style>
+    :root {
+      --primary-color: #003580;
+      --text-color: #2c3e50;
+      --bg-color: #ffffff;
+      --card-bg: #f8fafc;
+      --border-color: #e2e8f0;
+      --code-bg: #1e293b;
+      --code-text: #f8fafc;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      line-height: 1.6;
+      color: var(--text-color);
+      background-color: var(--bg-color);
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 40px 20px;
+    }
+
+    h1, h2, h3, h4 {
+      color: var(--primary-color);
+      font-weight: 700;
+      margin-top: 1.8em;
+      margin-bottom: 0.5em;
+    }
+
+    h1 {
+      font-size: 2.2rem;
+      border-bottom: 3px solid var(--primary-color);
+      padding-bottom: 12px;
+      margin-top: 0;
+    }
+
+    h2 {
+      font-size: 1.6rem;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 8px;
+    }
+
+    h3 {
+      font-size: 1.25rem;
+    }
+
+    p, li {
+      font-size: 1.05rem;
+      margin-bottom: 1rem;
+    }
+
+    a {
+      color: var(--primary-color);
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    hr {
+      border: 0;
+      height: 1px;
+      background: var(--border-color);
+      margin: 2.5rem 0;
+    }
+
+    /* Estilo para Tabelas */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1.5rem 0;
+      font-size: 0.95rem;
+    }
+
+    th, td {
+      border: 1px solid var(--border-color);
+      padding: 12px 16px;
+      text-align: left;
+    }
+
+    th {
+      background-color: #f1f5f9;
+      color: var(--primary-color);
+      font-weight: 700;
+    }
+
+    tr:nth-child(even) {
+      background-color: var(--card-bg);
+    }
+
+    /* Estilo para Blocos de Código e inline code */
+    code {
+      font-family: SFMono-Regular, Consolas, "Liberation Mono", Menlo, Courier, monospace;
+      font-size: 0.9rem;
+      background-color: #f1f5f9;
+      color: #b91c1c;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    pre {
+      background-color: var(--code-bg);
+      padding: 16px;
+      border-radius: 8px;
+      overflow-x: auto;
+      margin: 1.5rem 0;
+    }
+
+    pre code {
+      background-color: transparent;
+      color: var(--code-text);
+      padding: 0;
+      font-size: 0.9rem;
+      display: block;
+    }
+
+    /* Blockquotes e Dicas */
+    blockquote {
+      border-left: 4px solid var(--primary-color);
+      background-color: var(--card-bg);
+      margin: 1.5rem 0;
+      padding: 12px 24px;
+      font-style: italic;
+    }
+
+    /* Otimizações de Impressão (para exportar para PDF) */
+    @media print {
+      body {
+        padding: 0;
+        font-size: 11pt;
+        color: #000;
+      }
+      h1, h2, h3, h4 {
+        page-break-after: avoid;
+        color: #000;
+        border-color: #000;
+      }
+      pre, table, blockquote {
+        page-break-inside: avoid;
+      }
+      a {
+        text-decoration: none;
+        color: #000;
+      }
+      /* Oculta URLs das âncoras na impressão */
+      a[href]::after {
+        content: "";
+      }
+    }
+  </style>
+</head>
+<body>
+  <h1>Documentação de Arquitetura e SSI — Sistema RU UNIFESP</h1>
+<p>Este documento detalha o funcionamento técnico do Sistema de Restaurante Universitário (RU) descentralizado da UNIFESP. Ele descreve a arquitetura do sistema, a aplicação prática dos conceitos de <strong>Identidade Auto-Soberana (SSI)</strong> e as decisões tecnológicas tomadas para a sua construção.</p>
+<hr>
+<h2>1. O Triângulo de Confiança da Identidade Auto-Soberana (SSI)</h2>
+<p>A Identidade Auto-Soberana (SSI) devolve ao indivíduo o controle sobre seus próprios dados e identidade digital. O sistema está estruturado em torno do clássico <strong>Triângulo da Confiança (Trust Triangle)</strong> da SSI, composto por três papéis fundamentais:</p>
+<pre><code>┌──────────────────┐     Emite VC      ┌──────────────────┐
+│  Portal UNIFESP  │ ────────────────► │  Carteira Aluno  │
+│    (Issuer)      │                   │    (Holder)      │
+│   porta 3000     │                   │   porta 3001     │
+└──────────────────┘                   └────────┬─────────┘
+        │                                       │
+        │ Adiciona créditos                     │ Apresenta QR Code
+        ▼                                       ▼
+┌──────────────────┐     Verifica VP    ┌──────────────────┐
+│   Blockchain     │ ◄──────────────── │  Terminal RU     │
+│   (Hardhat)      │   Debita crédito  │   (Verifier)     │
+│   porta 8545     │                   │   porta 3002     │
+└──────────────────┘                   └──────────────────┘
+</code></pre>
+<h3>Papéis no Sistema:</h3>
+<ol>
+<li><strong>Emissor (Issuer) — Portal UNIFESP</strong>: Autoridade confiável encarregada de validar os dados acadêmicos do aluno no cadastro e emitir uma <strong>Credencial Verificável (VC)</strong> assinada criptograficamente. O Emissor possui seu próprio DID (<code>did:ethr:sepolia:0x03aa...</code>).</li>
+<li><strong>Portador (Holder) — Carteira do Aluno</strong>: O estudante, que gera seu par de chaves criptográficas e DID localmente na carteira digital e armazena de forma segura a sua credencial universitária. Ele gera <strong>Apresentações Verificáveis (VPs)</strong> temporárias via QR Code para provar quem é sem expor sua chave privada.</li>
+<li><strong>Verificador (Verifier) — Terminal RU</strong>: O leitor físico no guichê do RU que lê o QR Code, resolve as chaves criptográficas dos DIDs envolvidos, valida se a credencial foi emitida pela UNIFESP, verifica se ela não foi revogada on-chain e debita os créditos da refeição.</li>
+</ol>
+<hr>
+<h2>2. Conceitos de SSI Aplicados</h2>
+<p>O projeto foi projetado seguindo estritamente as especificações do <strong>W3C</strong> para identidades digitais descentralizadas:</p>
+<h3>A. DIDs (Decentralized Identifiers)</h3>
+<ul>
+<li><strong>O que é</strong>: Identificadores únicos globais que dispensam uma autoridade de registro centralizada.</li>
+<li><strong>Aplicação no Projeto</strong>: Usamos o método <code>did:ethr</code> na rede Sepolia/Local. O DID do aluno se assemelha a <code>did:ethr:sepolia:0x03bB...</code>. Ele é composto por uma chave pública gerada na carteira do aluno e é usado como o identificador definitivo do estudante nas credenciais e nos contratos inteligentes.</li>
+</ul>
+<h3>B. VCs (Verifiable Credentials)</h3>
+<ul>
+<li><strong>O que é</strong>: Uma afirmação digital à prova de adulteração contendo dados estruturados e assinada pelo Emissor.</li>
+<li><strong>Aplicação no Projeto</strong>: Quando a UNIFESP cadastra o aluno, ela emite uma VC com formato JWT (JSON Web Token), assinada usando o algoritmo <code>ES256K</code> da UNIFESP. O payload contém:<ul>
+<li><strong>Issuer</strong>: O DID da UNIFESP.</li>
+<li><strong>CredentialSubject</strong>: O DID do Aluno, Nome completo, RA, Curso e Status.</li>
+</ul>
+</li>
+</ul>
+<h3>C. VPs (Verifiable Presentations)</h3>
+<ul>
+<li><strong>O que é</strong>: Um envelope seguro contendo uma ou mais VCs, assinado pelo próprio Holder usando sua chave privada para comprovar a posse das credenciais (Proof of Possession).</li>
+<li><strong>Aplicação no Projeto</strong>: Quando o aluno vai passar na catraca do RU, ele digita sua senha e a carteira gera uma VP contendo sua VC universitária. A VP é assinada com a chave privada do aluno e disponibilizada através de um QR Code dinâmico que expira em 2 minutos e é de uso único, prevenindo ataques de replay.</li>
+</ul>
+<h3>D. Custódia Descentralizada de Chaves (True Custody)</h3>
+<ul>
+<li><strong>O que é</strong>: O princípio de que apenas o usuário detém o controle sobre suas chaves privadas (&quot;not your keys, not your identity&quot;).</li>
+<li><strong>Aplicação no Projeto</strong>: O Portal UNIFESP não gera chaves para o aluno. O aluno cria suas chaves e seu DID de forma local em sua própria carteira (<code>holder-agent</code>) e fornece apenas o DID público para a UNIFESP no momento do cadastro. Isso garante que a UNIFESP nunca consiga gerar uma apresentação ou assinar transações em nome do estudante.</li>
+</ul>
+<h3>E. Revogação On-Chain (On-Chain Revocation)</h3>
+<ul>
+<li><strong>O que é</strong>: O mecanismo de invalidar uma credencial de maneira imediata sem depender de servidores centralizados do emissor para consultas constantes.</li>
+<li><strong>Aplicação no Projeto</strong>: Quando uma credencial precisa ser revogada (por exemplo, se o aluno trancou o curso ou perdeu o celular), a UNIFESP faz o hash do JWT da credencial e envia uma transação para o contrato inteligente <code>RevocationRegistry.sol</code>, marcando o hash como revogado (<code>revoked[hash] = true</code>). O Terminal do RU consulta este contrato on-chain em tempo real durante a validação do QR Code.</li>
+</ul>
+<hr>
+<h2>3. Tecnologias Utilizadas e Justificativa</h2>
+<p>A seleção tecnológica foi estruturada combinando criptografia de chave pública W3C e imutabilidade de contratos inteligentes:</p>
+<table>
+<thead>
+<tr>
+<th align="left">Tecnologia</th>
+<th align="left">Função no Sistema</th>
+<th align="left">Por Que Foi Usada? (Justificativa)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>Veramo Framework</strong></td>
+<td align="left">Agente de Identidade Descentralizada (KMS, DID Manager, Credential Plugin)</td>
+<td align="left">O Veramo é um dos frameworks de SSI mais modulares do ecossistema JavaScript/TypeScript. Ele abstrai toda a complexidade criptográfica necessária para gerar chaves (secp256k1), criar DIDs de diversos métodos (como <code>did:ethr</code>), e assinar/verificar VCs e VPs em conformidade com o padrão W3C.</td>
+</tr>
+<tr>
+<td align="left"><strong>Hardhat</strong></td>
+<td align="left">Blockchain local de desenvolvimento</td>
+<td align="left">Fornece um ambiente de teste robusto, seguro e idêntico a uma rede principal Ethereum virtualizada. Permite deploys instantâneos, manipulação do estado da blockchain para testes e simulação realista das contas pré-financiadas (contas signers).</td>
+</tr>
+<tr>
+<td align="left"><strong>Solidity (Smart Contracts)</strong></td>
+<td align="left">Lógica de negócios de saldos e revogação</td>
+<td align="left">Permite descentralizar regras de negócios críticas: <br>• O contrato <code>CreditoRU</code> gerencia os saldos de forma pública, auditável e imutável.<br>• O contrato <code>RevocationRegistry</code> oferece um repositório distribuído de revogação de alta disponibilidade e resistente a censura.</td>
+</tr>
+<tr>
+<td align="left"><strong>ethers.js (v6)</strong></td>
+<td align="left">Ponte entre os Servidores Node.js e a Blockchain</td>
+<td align="left">É a biblioteca padrão do ecossistema Ethereum para conectar aplicações web a nós Web3. Foi usada para codificar/decodificar chamadas de contratos inteligentes e assinar transações de revogação e consumo de créditos no RU de forma simplificada.</td>
+</tr>
+<tr>
+<td align="left"><strong>better-sqlite3</strong></td>
+<td align="left">Banco de dados para persistência local</td>
+<td align="left">Banco de dados relacional embarcado extremamente veloz e que roda em arquivo único. Perfeito para evitar a complexidade de configurar bancos de dados externos (como Postgres) em um ambiente de demonstração acadêmica, sem abrir mão de consultas SQL robustas.</td>
+</tr>
+<tr>
+<td align="left"><strong>Express &amp; TypeScript</strong></td>
+<td align="left">Servidores Web de cada agente e tipagem do código</td>
+<td align="left">O Express oferece uma infraestrutura de roteamento leve e simples para as interfaces web e APIs. O TypeScript garante segurança em tempo de compilação, permitindo tipar interfaces criptográficas do Veramo e contratos do ethers.js.</td>
+</tr>
+<tr>
+<td align="left"><strong>ngrok</strong></td>
+<td align="left">Túnel HTTP seguro</td>
+<td align="left">Permite que o Terminal RU local receba conexões HTTPS externas. Isso torna possível testar o sistema na prática usando a câmera de um celular físico fora do computador de desenvolvimento para ler o QR Code e liberar a catraca.</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>4. Fluxo Detalhado de Operação do RU</h2>
+<p>Abaixo está o passo a passo de como a informação flui através dos componentes do sistema durante uma operação típica:</p>
+<h3>Fluxo 1: Geração de DID e Cadastro</h3>
+<pre><code>1. Aluno -&gt; Acessa Carteira (/aluno) -&gt; Clica em Gerar DID
+   ├── O agente local cria chaves secp256k1 privadas/públicas no banco de dados da carteira
+   └── Retorna o DID público: did:ethr:sepolia:0x[EndereçoAluno]
+
+2. Aluno -&gt; Fornece DID ao Administrador da UNIFESP
+3. Administrador -&gt; Preenche cadastro no Portal UNIFESP com o DID do Aluno
+   └── O Portal UNIFESP assina uma credencial (VC) JWT:
+       - Subject ID: did:ethr:sepolia:0x[EndereçoAluno]
+       - Assinada por: did:ethr:sepolia:0x[EndereçoUNIFESP]
+   └── Os dados acadêmicos e a VC criptografada são armazenados no banco &#39;database-alunos.sqlite&#39;
+</code></pre>
+<h3>Fluxo 2: Recarga de Créditos do RU</h3>
+<pre><code>1. Administrador -&gt; Acessa página de Créditos do Portal
+2. Administrador -&gt; Digita o RA e a quantidade de créditos (ex: 15 créditos)
+3. Portal UNIFESP -&gt; Executa transação on-chain chamando o smart contract &#39;CreditoRU&#39;
+   └── A transação executa o método &#39;adicionarCreditos(ra, 15)&#39; assinado pela chave privada da UNIFESP
+   └── A blockchain atualiza o saldo do RA imutavelmente
+</code></pre>
+<h3>Fluxo 3: Acesso ao Refeitório (Consumo e Validação)</h3>
+<pre><code>1. Aluno -&gt; Faz login na Carteira com RA e Senha
+2. Carteira -&gt; Cria uma Verifiable Presentation (VP)
+   ├── Insere a VC emitida pela UNIFESP no payload
+   ├── Assina a VP com a chave privada do aluno guardada localmente
+   └── Renderiza um QR Code contendo uma URL temporária com a VP assinada
+   
+3. Terminal RU -&gt; Escaneia o QR Code do celular do aluno
+4. Terminal RU -&gt; Resolve o DID do Aluno e o DID da UNIFESP
+   ├── Valida se a assinatura da VP é de fato do aluno (Proof of Possession)
+   ├── Valida se a VC embutida foi mesmo emitida e assinada pelo DID da UNIFESP
+   ├── Faz o hash da credencial (Keccak256 do JWT)
+   ├── Consulta o contrato &#39;RevocationRegistry&#39;: se constar como revogado -&gt; ACESSO NEGADO
+   └── Consulta o contrato &#39;CreditoRU&#39;: se saldo for zero -&gt; ACESSO NEGADO
+   
+5. Terminal RU -&gt; Executa transação chamando &#39;consumirCredito(ra)&#39; no smart contract
+   └── O contrato debita 1 crédito do RA e emite o evento de consumo
+   └── Terminal RU exibe na tela: &quot;✅ Acesso Liberado!&quot;
+</code></pre>
+
+</body>
+</html>
