@@ -12,7 +12,7 @@ import { getContractAddress } from '../utils.js'
 const app = express()
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
-const PORT = 3001
+const PORT = process.env.PORT_HOLDER ? parseInt(process.env.PORT_HOLDER) : (process.env.PORT ? parseInt(process.env.PORT) : 3001)
 const RPC_URL = process.env.HARDHAT_RPC_URL!
 const CONTRACT_ABI = [
     'function consultarSaldo(string memory ra) public view returns (uint256)',
@@ -26,6 +26,7 @@ function loadDB(): Record<string, any> {
 }
 
 const vpStore: Record<string, { vp: any, expira: number }> = {}
+const sessions: Record<string, string> = {} // sessionToken -> ra
 
 const HTML = (content: string) => `
 <!DOCTYPE html>
@@ -65,6 +66,14 @@ app.get('/aluno/:ra', (req, res) => {
         return
     }
 
+    // Verificar se já tem sessão válida
+    const cookieHeader = req.headers.cookie || ''
+    const token = cookieHeader.split(';').map(c => c.trim().split('=')).find(([k]) => k === 'session_token')?.[1]
+    if (token && sessions[token] === ra) {
+        res.redirect(`/aluno/${ra}/qr`)
+        return
+    }
+
     const err = req.query.err ? `<div class="alert-error">${req.query.err}</div>` : ''
 
     res.send(HTML(`
@@ -96,6 +105,9 @@ app.post('/aluno/:ra/login', async (req, res) => {
         return
     }
 
+    const token = randomUUID()
+    sessions[token] = ra
+    res.cookie('session_token', token, { httpOnly: true, maxAge: 10 * 60 * 1000 }) // 10 minutos
     res.redirect(`/aluno/${ra}/qr`)
 })
 
@@ -106,6 +118,14 @@ app.get('/aluno/:ra/qr', async (req, res) => {
 
     if (!db[ra]) {
         res.send(HTML('<h2>❌ Aluno não encontrado.</h2>'))
+        return
+    }
+
+    // Verificar se a sessão é válida e pertence a este RA
+    const cookieHeader = req.headers.cookie || ''
+    const token = cookieHeader.split(';').map(c => c.trim().split('=')).find(([k]) => k === 'session_token')?.[1]
+    if (!token || sessions[token] !== ra) {
+        res.redirect(`/aluno/${ra}?err=Acesso negado. Por favor, faça login.`)
         return
     }
 
@@ -129,7 +149,7 @@ app.get('/aluno/:ra/qr', async (req, res) => {
         const expira = Date.now() + 2 * 60 * 1000
         vpStore[token] = { vp, expira }
 
-        const qrUrl = `http://${LOCAL_IP}:3001/vp/${token}`
+        const qrUrl = `http://${LOCAL_IP}:${PORT}/vp/${token}`
         const qrDataUrl = await QRCode.toDataURL(qrUrl, { width: 280 })
         const expiraDate = new Date(expira)
 

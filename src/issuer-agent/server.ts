@@ -10,7 +10,7 @@ import { getLocalIP, getContractAddress, getNgrokUrl } from '../utils.js'
 const app = express()
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
-const PORT = 3000
+const PORT = process.env.PORT_UNIFESP ? parseInt(process.env.PORT_UNIFESP) : 3000
 
 const DB_FILE = './credentials/alunos.json'
 const UNIFESP_PRIVATE_KEY = process.env.UNIFESP_PRIVATE_KEY!
@@ -18,18 +18,18 @@ const RPC_URL = process.env.HARDHAT_RPC_URL!
 const LOCAL_IP = getLocalIP()
 
 const CONTRACT_ABI = [
-    'function adicionarCreditos(string memory ra, uint256 quantidade) public',
-    'function consultarSaldo(string memory ra) public view returns (uint256)',
+  'function adicionarCreditos(string memory ra, uint256 quantidade) public',
+  'function consultarSaldo(string memory ra) public view returns (uint256)',
 ]
 
 // Banco simples em JSON
 function loadDB(): Record<string, any> {
-    if (!existsSync(DB_FILE)) return {}
-    return JSON.parse(readFileSync(DB_FILE, 'utf-8'))
+  if (!existsSync(DB_FILE)) return {}
+  return JSON.parse(readFileSync(DB_FILE, 'utf-8'))
 }
 
 function saveDB(db: Record<string, any>) {
-    writeFileSync(DB_FILE, JSON.stringify(db, null, 2))
+  writeFileSync(DB_FILE, JSON.stringify(db, null, 2))
 }
 
 const HTML = (content: string, title = 'Portal UNIFESP') => `
@@ -76,30 +76,31 @@ const HTML = (content: string, title = 'Portal UNIFESP') => `
 
 // Página principal — lista alunos + cadastro
 app.get('/', async (req, res) => {
-    const db = loadDB()
-    const provider = new ethers.JsonRpcProvider(RPC_URL)
-    const contrato = new ethers.Contract(getContractAddress(), CONTRACT_ABI, provider)
+  const db = loadDB()
+  const provider = new ethers.JsonRpcProvider(RPC_URL)
+  const contrato = new ethers.Contract(getContractAddress(), CONTRACT_ABI, provider)
 
-    let rows = ''
-    for (const ra in db) {
-        const aluno = db[ra]
-        let saldo = '—'
-        try {
-            saldo = (await contrato.consultarSaldo(ra)).toString()
-        } catch { }
-        rows += `<tr>
+  let rows = ''
+  for (const ra in db) {
+    const aluno = db[ra]
+    let saldo = '—'
+    try {
+      saldo = (await contrato.consultarSaldo(ra)).toString()
+    } catch { }
+    const porta = aluno.porta || process.env.PORT_HOLDER || '3001'
+    rows += `<tr>
       <td>${aluno.nome}</td>
       <td>${ra}</td>
       <td>${aluno.curso}</td>
       <td><span class="badge">${saldo} créditos</span></td>
-      <td><a href="/aluno/${ra}/credencial" target="_blank">🔗 Link</a></td>
+      <td><a href="/aluno/${ra}/${porta}/credencial" target="_blank">🔗 Link</a></td>
     </tr>`
-    }
+  }
 
-    const msg = req.query.msg ? `<div class="alert alert-success">${req.query.msg}</div>` : ''
-    const err = req.query.err ? `<div class="alert alert-error">${req.query.err}</div>` : ''
+  const msg = req.query.msg ? `<div class="alert alert-success">${req.query.msg}</div>` : ''
+  const err = req.query.err ? `<div class="alert alert-error">${req.query.err}</div>` : ''
 
-    res.send(HTML(`
+  res.send(HTML(`
     ${msg}${err}
     <div class="card">
       <h2>Cadastrar Novo Aluno</h2>
@@ -108,6 +109,7 @@ app.get('/', async (req, res) => {
         <input name="ra" placeholder="RA (matrícula)" required />
         <input name="curso" placeholder="Curso" required />
         <input name="senha" type="password" placeholder="Senha do aluno" required />
+        <input name="porta" type="number" placeholder="Porta do aluno (ex: 3001)" required />
         <button type="submit">Cadastrar e Emitir Credencial</button>
       </form>
     </div>
@@ -123,63 +125,63 @@ app.get('/', async (req, res) => {
 
 // Cadastrar aluno + emitir VC
 app.post('/cadastrar', async (req, res) => {
-    const { nome, ra, curso, senha } = req.body
-    const db = loadDB()
+  const { nome, ra, curso, senha, porta } = req.body
+  const db = loadDB()
 
-    if (db[ra]) {
-        res.redirect(`/?err=RA ${ra} já cadastrado.`)
-        return
-    }
+  if (db[ra]) {
+    res.redirect(`/?err=RA ${ra} já cadastrado.`)
+    return
+  }
 
-    try {
-        const issuer = await agent.didManagerGetByAlias({ alias: 'unifesp-issuer' })
+  try {
+    const issuer = await agent.didManagerGetByAlias({ alias: 'unifesp-issuer' })
 
-        // Criar DID para o aluno no agente do holder
-        const holderIdentifier = await holderAgent.didManagerCreate({ alias: `aluno-${ra}` })
+    // Criar DID para o aluno no agente do holder
+    const holderIdentifier = await holderAgent.didManagerCreate({ alias: `aluno-${ra}` })
 
-        // Emitir credencial
-        const vc = await agent.createVerifiableCredential({
-            credential: {
-                issuer: { id: issuer.did },
-                type: ['VerifiableCredential', 'CredencialUniversitariaRU'],
-                credentialSubject: {
-                    id: holderIdentifier.did,
-                    ra,
-                    name: nome,
-                    course: curso,
-                    enrollmentStatus: 'active',
-                },
-            },
-            proofFormat: 'jwt',
-        })
+    // Emitir credencial
+    const vc = await agent.createVerifiableCredential({
+      credential: {
+        issuer: { id: issuer.did },
+        type: ['VerifiableCredential', 'CredencialUniversitariaRU'],
+        credentialSubject: {
+          id: holderIdentifier.did,
+          ra,
+          name: nome,
+          course: curso,
+          enrollmentStatus: 'active',
+        },
+      },
+      proofFormat: 'jwt',
+    })
 
-        // Salvar no banco local
-        const senhaHash = await bcrypt.hash(senha, 10)
-        db[ra] = { nome, curso, senhaHash, did: holderIdentifier.did, vc }
-        saveDB(db)
+    // Salvar no banco local
+    const senhaHash = await bcrypt.hash(senha, 10)
+    db[ra] = { nome, curso, senhaHash, did: holderIdentifier.did, vc, porta: parseInt(porta) || parseInt(process.env.PORT_HOLDER || '3001') }
+    saveDB(db)
 
-        res.redirect(`/?msg=Aluno ${nome} cadastrado com sucesso!`)
-    } catch (err: any) {
-        console.error(err)
-        res.redirect(`/?err=Erro ao cadastrar: ${err.message}`)
-    }
+    res.redirect(`/?msg=Aluno ${nome} cadastrado com sucesso!`)
+  } catch (err: any) {
+    console.error(err)
+    res.redirect(`/?err=Erro ao cadastrar: ${err.message}`)
+  }
 })
 
 // Página de créditos
 app.get('/creditos', async (req, res) => {
-    const db = loadDB()
-    const provider = new ethers.JsonRpcProvider(RPC_URL)
-    const contrato = new ethers.Contract(getContractAddress(), CONTRACT_ABI, provider)
+  const db = loadDB()
+  const provider = new ethers.JsonRpcProvider(RPC_URL)
+  const contrato = new ethers.Contract(getContractAddress(), CONTRACT_ABI, provider)
 
-    let options = ''
-    for (const ra in db) {
-        options += `<option value="${ra}">${db[ra].nome} (RA: ${ra})</option>`
-    }
+  let options = ''
+  for (const ra in db) {
+    options += `<option value="${ra}">${db[ra].nome} (RA: ${ra})</option>`
+  }
 
-    const msg = req.query.msg ? `<div class="alert alert-success">${req.query.msg}</div>` : ''
-    const err = req.query.err ? `<div class="alert alert-error">${req.query.err}</div>` : ''
+  const msg = req.query.msg ? `<div class="alert alert-success">${req.query.msg}</div>` : ''
+  const err = req.query.err ? `<div class="alert alert-error">${req.query.err}</div>` : ''
 
-    res.send(HTML(`
+  res.send(HTML(`
     ${msg}${err}
     <div class="card">
       <h2>Adicionar Créditos</h2>
@@ -197,52 +199,60 @@ app.get('/creditos', async (req, res) => {
 
 // Adicionar créditos
 app.post('/creditos/adicionar', async (req, res) => {
-    const { ra, quantidade } = req.body
-    try {
-        const provider = new ethers.JsonRpcProvider(RPC_URL)
-        const unifespWallet = new ethers.Wallet(UNIFESP_PRIVATE_KEY, provider)
-        const contrato = new ethers.Contract(getContractAddress(), CONTRACT_ABI, unifespWallet)
-        const tx = await contrato.adicionarCreditos(ra, parseInt(quantidade))
-        await tx.wait()
-        res.redirect(`/creditos?msg=${quantidade} créditos adicionados para RA ${ra}`)
-    } catch (err: any) {
-        res.redirect(`/creditos?err=Erro: ${err.message}`)
-    }
+  const { ra, quantidade } = req.body
+  try {
+    const provider = new ethers.JsonRpcProvider(RPC_URL)
+    const unifespWallet = new ethers.Wallet(UNIFESP_PRIVATE_KEY, provider)
+    const contrato = new ethers.Contract(getContractAddress(), CONTRACT_ABI, unifespWallet)
+    const tx = await contrato.adicionarCreditos(ra, parseInt(quantidade))
+    await tx.wait()
+    res.redirect(`/creditos?msg=${quantidade} créditos adicionados para RA ${ra}`)
+  } catch (err: any) {
+    res.redirect(`/creditos?err=Erro: ${err.message}`)
+  }
 })
 
 // Status do sistema
 app.get('/status', async (req, res) => {
-    let blockchain = '❌ Offline'
-    let veramo = '❌ Offline'
+  let blockchain = '❌ Offline'
+  let veramo = '❌ Offline'
 
-    try {
-        const provider = new ethers.JsonRpcProvider(RPC_URL)
-        await provider.getBlockNumber()
-        blockchain = '✅ Online'
-    } catch { }
+  try {
+    const provider = new ethers.JsonRpcProvider(RPC_URL)
+    await provider.getBlockNumber()
+    blockchain = '✅ Online'
+  } catch { }
 
-    try {
-        await agent.didManagerFind()
-        veramo = '✅ Online'
-    } catch { }
+  try {
+    await agent.didManagerFind()
+    veramo = '✅ Online'
+  } catch { }
 
-    res.send(HTML(`
+  res.send(HTML(`
     <div class="card">
       <h2>Status dos Serviços</h2>
       <table>
         <tr><td><strong>Blockchain (Hardhat)</strong></td><td>${blockchain}</td></tr>
         <tr><td><strong>Agente Veramo (UNIFESP)</strong></td><td>${veramo}</td></tr>
-        <tr><td><strong>Carteira do Aluno</strong></td><td>✅ <a href="http://192.168.15.7:3001" target="_blank">http://192.168.15.7:3001</a></td></tr>
+        <tr><td><strong>Carteira do Aluno</strong></td><td>✅ <a href="http://${LOCAL_IP}:${process.env.PORT_HOLDER || '3001'}" target="_blank">http://${LOCAL_IP}:${process.env.PORT_HOLDER || '3001'}</a></td></tr>
 <tr><td><strong>Terminal RU</strong></td><td>✅ <a href="https://pending-unvarying-dash.ngrok-free.dev" target="_blank">ngrok ativo</a></td></tr>      </table>
     </div>
   `))
 })
 
 // Link da carteira do aluno (redireciona para o servidor do holder)
-app.get('/aluno/:ra/credencial', (req, res) => {
-    res.redirect(`http://192.168.15.7:3001/aluno/${req.params.ra}`)
-})
+const redirecionarCarteira = (req: express.Request, res: express.Response) => {
+  const db = loadDB()
+  const aluno = db[req.params.ra]
+  const port = req.params.port || aluno?.porta || process.env.PORT_HOLDER || '3001'
+  res.redirect(`http://${LOCAL_IP}:${port}/aluno/${req.params.ra}`)
+}
+
+app.get('/aluno/:ra/:port/credencial', redirecionarCarteira)
+app.get('/aluno/:ra/credencial', redirecionarCarteira)
 
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Portal UNIFESP rodando em http://localhost:${PORT}`)
+  console.log(`Portal UNIFESP rodando em http://localhost:${PORT}`)
+  console.log(`Acesse: http://${LOCAL_IP}:${PORT}`)
+
 })
